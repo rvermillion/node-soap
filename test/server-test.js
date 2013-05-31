@@ -14,11 +14,34 @@ var service = {
     }
 }
 
+var wsdlStrictTests = {},
+    wsdlNonStrictTests = {};
+
+fs.readdirSync(__dirname+'/wsdl/strict').forEach(function(file) {
+    if (!/.wsdl$/.exec(file)) return;
+    wsdlStrictTests['should parse '+file] = function(done) {
+        soap.createClient(__dirname+'/wsdl/strict/'+file, {strict: true}, function(err, client) {
+            assert.ok(!err);
+            done();
+        });        
+    };
+})
+
+fs.readdirSync(__dirname+'/wsdl').forEach(function(file) {
+    if (!/.wsdl$/.exec(file)) return;
+    wsdlNonStrictTests['should parse '+file] = function(done) {
+        soap.createClient(__dirname+'/wsdl/'+file, function(err, client) {
+            assert.ok(!err);
+            done();
+        });        
+    };
+})
+
 module.exports = {
     'SOAP Server': {
 
         'should start': function(done) {
-            var wsdl = fs.readFileSync(__dirname+'/stockquote.wsdl', 'utf8'),
+            var wsdl = fs.readFileSync(__dirname+'/wsdl/strict/stockquote.wsdl', 'utf8'),
                 server = http.createServer(function(req, res) {
                     res.statusCode = 404;
                     res.end();
@@ -48,6 +71,16 @@ module.exports = {
             })            
         },
 
+        'should return complete client description': function(done) {
+            soap.createClient('http://localhost:15099/stockquote?wsdl', function(err, client) {
+                assert.ok(!err);
+                var description = client.describe(),
+                    expected = { input: { tickerSymbol: "string" }, output:{ price: "float" } };
+                assert.deepEqual(expected , description.StockQuoteService.StockQuotePort.GetLastTradePrice );
+                done();
+            });
+        },
+
         'should return correct results': function(done) {
             soap.createClient('http://localhost:15099/stockquote?wsdl', function(err, client) {
                 assert.ok(!err);
@@ -58,5 +91,7 @@ module.exports = {
                 });            
             });
         }
-    }
+    },
+    'WSDL Parser (strict)': wsdlStrictTests,
+    'WSDL Parser (non-strict)': wsdlNonStrictTests  
 }
